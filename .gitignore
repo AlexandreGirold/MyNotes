@@ -1,0 +1,52 @@
+# Application data — always outside repo
+*.db
+*.sqlite
+*.sqlite3
+data/
+*.key
+*.enc
+credentials/
+.env
+.env.*
+
+# Recordings and generated output
+recordings/
+exports/
+*.mp3
+*.wav
+*.pdf
+*.html
+*.pptx
+*.png
+*.jpg
+*.jpeg
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+.venv/
+venv/
+ENV/
+
+# Generated / compiled
+*.spec
+!mynotes-backend.spec
+!index.html
+node_modules/
+out/
+resources/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

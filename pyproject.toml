@@ -1,0 +1,48 @@
+[project]
+name = "mynotes"
+version = "0.1.0"
+description = "Single-user desktop study tool: courses, documents, notes, chat, and slides."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "python-multipart>=0.0.20",
+    "httpx>=0.28",
+    "cryptography>=44",
+    "pypdfium2>=4.30",
+    "python-pptx>=1.0",
+    "beautifulsoup4>=4.13",
+    "Pillow>=11.1",
+    "mcp>=1.2",
+    "websockets>=15,<17",
+    "sherpa-onnx==1.13.8",
+    "faster-whisper>=1.2,<2",
+    "sherpa-onnx-core==1.13.8",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.9", "pyinstaller>=6.11", "pytest>=8.0"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[project.scripts]
+mynotes = "mynotes.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mynotes"]
+
+[tool.hatch.build.targets.pyinstaller]
+only-include = ["mynotes"]
+sources = ["src"]

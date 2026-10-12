@@ -1,0 +1,19 @@
+{
+  "mcp": {
+    "mynotes": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--project",
+        "/absolute/path/to/MyNotes",
+        "--locked",
+        "python",
+        "-m",
+        "mynotes",
+        "mcp"
+      ],
+      "enabled": true
+    }
+  }
+}

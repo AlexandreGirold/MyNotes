@@ -1,0 +1,117 @@
+flowchart LR
+    user([Utilisateur])
+
+    subgraph desktop["PC local — application MyNotes"]
+        direction LR
+        subgraph electron["Electron — application de bureau"]
+            ui["React + TypeScript<br/>Notes · Documents · Recherche<br/>Chat · Live notes · Cours · Présentations"]
+            preload["Preload sécurisé / IPC<br/>Connexion backend · microphone<br/>Sélecteurs de dossiers · Enregistrer sous<br/>Réglage du volume micro système"]
+            main["Processus principal Electron<br/>Démarrage et arrêt du backend<br/>Isolation du renderer"]
+            pcm["AudioWorklet<br/>Microphone → PCM16 mono / 16 kHz"]
+        end
+
+        subgraph backend["Backend unique — Python / FastAPI"]
+            api["API locale authentifiée<br/>127.0.0.1 : port dynamique<br/>Token UI distinct du token outils"]
+            live["Relais WebSocket Voxtral<br/>Flux audio + transcription live<br/>Sauvegardes périodiques du texte"]
+            worker["Worker unique<br/>Jobs persistants SQLite<br/>Opérations longues : 202 + polling"]
+            imports["Imports / extraction<br/>PDF · Markdown · HTML<br/>Typst · PPTX · OCR optionnel"]
+            notes["Notes et documents<br/>Versions immuables · Provenance<br/>Suppression logique de la bibliothèque"]
+            provider["Client Cloud Temple<br/>Chat · Résumés · Vision<br/>Transcription de fichiers"]
+            exports["Exports et présentations<br/>Brouillons de slides · Marp<br/>Markdown · HTML · PDF · Citations"]
+            backup["Sauvegarde / restauration<br/>Snapshot SQLite + ZIP<br/>Validation et restauration avec rollback"]
+        end
+
+        subgraph agent["Assistant avec outils — optionnel"]
+            opencode["CLI OpenCode isolé<br/>Sous-processus borné<br/>Conversation et étapes visibles"]
+            mcp["Bridge MCP MyNotes / stdio<br/>Sources sélectionnées<br/>Appels API avec token outils"]
+            allowed["Lecture locale autorisée<br/>Dossiers choisis par l'utilisateur<br/>Accès borné · secrets exclus"]
+        end
+
+        subgraph speakers["Diarisation locale après Stop — option expérimentale"]
+            audio["Audio WAV temporaire<br/>Uniquement si diarisation activée"]
+            diar["Sous-processus CPU jetable<br/>Sherpa-ONNX<br/>Segmentation INT8 + TitaNet Small"]
+            align["Ancres temporelles locales<br/>faster-whisper tiny INT8<br/>Correspondance avec le texte Voxtral"]
+            labelled["Transcription dérivée<br/>Locuteur + timestamps<br/>Attribution incertaine → inconnu"]
+            models["Modèles locaux optionnels<br/>Téléchargement explicite<br/>Hors sauvegarde des données"]
+        end
+
+        subgraph storage["Stockage local"]
+            db[("SQLite unique<br/>Documents · Versions · Blocs<br/>Jobs · Chats · Cours · Decks<br/>Recherche FTS5 / BM25")]
+            files[("Fichiers gérés<br/>Originaux · Notes · Assets<br/>Transcriptions · Exports · ZIP")]
+            secrets[("Secrets chiffrés<br/>Clé protégée par Electron safeStorage<br/>Identifiants chiffrés par Fernet")]
+            folders[("Dossiers utilisateur autorisés")]
+        end
+
+        subgraph tools["Outils d'exécution"]
+            marp["Node + Marp + navigateur headless<br/>Bundlés dans le paquet Linux"]
+            optional["Outils système optionnels<br/>Typst · Tesseract"]
+            volume["PipeWire / wpctl<br/>Volume du microphone par défaut<br/>Curseur 0–120 % dans Réglages"]
+        end
+    end
+
+    subgraph external["Services externes"]
+        cloud["Cloud Temple / HTTPS<br/>Modèles de chat et vision<br/>Transcription de fichiers"]
+        voxtral["Cloud Temple / WSS<br/>Voxtral-Mini-4B-Realtime-2602"]
+        downloads["GitHub + Hugging Face<br/>Téléchargement initial des modèles locaux"]
+    end
+
+    user --> ui
+    ui -->|"IPC via bridge exposé"| preload
+    preload --> main
+    main -->|"Lance le backend bundlé"| api
+    main -->|"Enregistrer sous / sélection native"| files
+    main --> secrets
+    main -->|"Commande native bornée"| volume
+    ui -->|"HTTP authentifié · polling des jobs"| api
+    ui --> pcm
+    pcm -->|"PCM binaire / WebSocket authentifié"| live
+    api --> db
+    api -->|"Queue persistante"| worker
+    api --> live
+    live -->|"Audio transmis en direct"| voxtral
+    live -->|"Texte brut / versions"| notes
+    live -.->|"Option diarisation"| audio
+    live -.->|"Job après finalisation"| worker
+    worker --> imports
+    worker --> notes
+    worker --> provider
+    worker --> exports
+    worker --> backup
+    notes --> db
+    notes --> files
+    imports --> files
+    imports --> db
+    imports --> optional
+    provider --> cloud
+    provider --> secrets
+    exports --> marp
+    exports --> files
+    backup --> db
+    backup --> files
+    worker --> opencode
+    opencode -->|"Appels modèle"| cloud
+    opencode --> mcp
+    mcp -->|"API outils restreinte"| api
+    mcp --> allowed
+    allowed --> folders
+    worker -.-> diar
+    diar --> audio
+    diar --> models
+    diar --> align
+    align --> labelled
+    labelled --> notes
+    worker -.->|"Installation demandée par l'utilisateur"| downloads
+    downloads -.-> models
+
+    classDef frontend fill:#ecfeff,stroke:#0891b2,color:#164e63;
+    classDef backend fill:#ecfdf5,stroke:#059669,color:#064e3b;
+    classDef store fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95;
+    classDef external fill:#fffbeb,stroke:#d97706,color:#78350f;
+    classDef security fill:#fff1f2,stroke:#e11d48,color:#881337;
+    classDef inprogress fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:5 5;
+    class ui,preload,main,pcm frontend;
+    class api,live,worker,imports,notes,provider,exports,backup,opencode,mcp,marp,optional,volume backend;
+    class db,files,folders store;
+    class cloud,voxtral,downloads external;
+    class secrets,allowed security;
+    class audio,diar,align,labelled,models inprogress;
