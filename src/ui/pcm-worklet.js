@@ -14,8 +14,12 @@ class MicrophonePCM extends AudioWorkletProcessor {
     if (!this.used) return;
     const buffer = new ArrayBuffer(this.used * 2);
     const view = new DataView(buffer);
-    for (let i = 0; i < this.used; i++) view.setInt16(i * 2, this.samples[i], true);
-    this.port.postMessage({ type: 'audio', buffer }, [buffer]);
+    let energy = 0;
+    for (let i = 0; i < this.used; i++) {
+      view.setInt16(i * 2, this.samples[i], true);
+      energy += (this.samples[i] / 32768) ** 2;
+    }
+    this.port.postMessage({ type: 'audio', buffer, level: Math.sqrt(energy / this.used) }, [buffer]);
     this.used = 0;
   }
   process(inputs) {

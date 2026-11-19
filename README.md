@@ -143,7 +143,7 @@ files and arbitrary shell commands are inaccessible. Provider secrets remain in
 the backend and are passed to the child process via environment interpolation,
 never written into a project configuration. The app isolates the agent's configuration,
 plugins and runtime state from your normal OpenCode workspace. OpenCode is bundled
-when available to `npm run build:tools`, otherwise an installed CLI is required.
+when available to `pnpm run build:tools`, otherwise an installed CLI is required.
 
 The top-bar night-mode button persists the theme. Liquid-glass panels use native
 CSS, with readable colors and a reduced-motion fallback.
@@ -151,7 +151,7 @@ CSS, with readable colors and a reduced-motion fallback.
 ### Build and verify the Linux package
 
 ```bash
-npm run package
+PNPM_CONFIG_NODE_LINKER=hoisted pnpm run package
 MYNOTES_SMOKE_TEST=1 MYNOTES_TEST_DATA_DIR=/tmp/mynotes-smoke ./out/MyNotes-linux-x64/MyNotes
 ```
 
@@ -169,12 +169,11 @@ for the verification boundary.
 | `uv sync --locked` | Install backend dependencies from `uv.lock` |
 | `uv run --extra dev python -m pytest -q` | Run backend tests |
 | `uv run --extra dev python -m ruff check src/mynotes tests` | Lint backend code |
-| `npm run build:backend` | Produce a PyInstaller bundle (packaging unverified) |
-| `npm ci` | Install frontend dependencies |
-| `npm start` | Build the UI and launch the desktop app and backend |
-| `npm run dev` | Start the UI-only Vite server; it does not provide the Electron bridge |
-| `npm run build` | Build React app for production |
-| `npm test` | Run frontend tests (Vitest) |
+| `pnpm run build:backend` | Produce a PyInstaller backend bundle |
+| `pnpm start` | Build the UI and launch the desktop app and backend |
+| `pnpm run dev` | Start the UI-only Vite server; it does not provide the Electron bridge |
+| `pnpm run build` | Build React app for production |
+| `pnpm test` | Run frontend tests (Vitest) |
 
 `uv.lock` pins Python dependencies. Never commit `__pycache__`, `.venv`, or generated output.
 
@@ -250,7 +249,20 @@ If lexical limits are demonstrated by evaluation, a semantic search experiment m
 
 ## Files on laptop
 
-Folders added in Settings appear as a nested, scrollable file tree. Select a
+Use **Add folder…** or **Open files…** directly in Notes & files; no provider
+connection is required. Opening a file also adds its parent folder to the allowed
+workspace. Select **New note or folder** to create a subfolder or a note; simple
+note names receive a `.md` extension and are created immediately at the original
+laptop location.
+
+Markdown notes have formatting shortcuts and a preview. **Save to original file**
+or Ctrl+S writes to disk. Optional **Autosave to original file** saves after a
+one-second pause; typing can continue during a pending save. If an external edit
+causes a conflict, the draft is kept and autosave stops. **Review disk version**
+lets you choose the disk copy or explicitly save your draft against the reviewed
+hash. Recovery storage alone does not save the original file.
+
+Folders appear as a nested, scrollable file tree. Select a
 text file to edit its original path, or select a folder to create a new note.
 **Save to original file** writes to disk; recovery drafts alone do not save the
 original. Concurrent external edits are reported as conflicts.
@@ -331,7 +343,7 @@ Produces a PyInstaller bundle. End users do not need `uv` or Python installed.
 ### Frontend
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Bundles the React app for production.

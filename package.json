@@ -6,12 +6,12 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "start": "npm run build && electron .",
+    "start": "pnpm run build && electron .",
     "build": "tsc --noEmit && vite build",
     "build:backend": "node scripts/build-backend.mjs",
     "build:tools": "node scripts/prepare-tools.mjs",
     "electron:make": "electron-forge make",
-    "package": "npm run build && npm run build:backend && npm run build:tools && electron-forge make --platform=linux --arch=x64",
+    "package": "pnpm run build && pnpm run build:backend && pnpm run build:tools && electron-forge make --platform=linux --arch=x64",
     "test": "vitest run",
     "test:watch": "vitest"
   },

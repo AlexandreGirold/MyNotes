@@ -39,6 +39,7 @@ async def stream_transcript(socket: WebSocket, db, data_dir: Path, credentials, 
         return
     await socket.accept()
     text, saved_text = "", ""
+    continuing = False
     document_id, version_id = None, None
     tasks = []
     session_id = uuid.uuid4().hex
@@ -74,6 +75,11 @@ async def stream_transcript(socket: WebSocket, db, data_dir: Path, credentials, 
             await socket.close(code=1008)
             return
         authenticated = True
+        initial_text = auth.get("initial_text", "")
+        if not isinstance(initial_text, str) or len(initial_text) > 2000000:
+            raise ValueError("Invalid existing transcript")
+        text = saved_text = initial_text
+        continuing = bool(text.strip())
         title = str(auth.get("title") or title)[:200]
         if type(auth.get("diarization", False)) is not bool:
             raise ValueError("Speaker detection option must be true or false")
@@ -132,7 +138,7 @@ async def stream_transcript(socket: WebSocket, db, data_dir: Path, credentials, 
                         return
 
             async def download():
-                nonlocal text, last_save, checkpoint
+                nonlocal text, last_save, checkpoint, continuing
                 async for raw in upstream:
                     event = json.loads(raw)
                     if not isinstance(event, dict):
@@ -140,7 +146,12 @@ async def stream_transcript(socket: WebSocket, db, data_dir: Path, credentials, 
                     kind = event.get("type")
                     if kind == "transcription.delta":
                         delta = event.get("delta", "")
-                        if not isinstance(delta, str) or len(text) + len(delta) > 2000000:
+                        if not isinstance(delta, str):
+                            raise ValueError("Invalid transcript text")
+                        if delta and continuing:
+                            delta = "\n\n" + delta
+                            continuing = False
+                        if len(text) + len(delta) > 2000000:
                             raise ValueError("Transcript exceeded the supported session size")
                         text += delta
                         await socket.send_json({"type": "delta", "delta": delta})

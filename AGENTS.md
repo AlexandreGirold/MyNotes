@@ -4,6 +4,8 @@ USE up too 100 qwen subagents. The main model is the orchestrator and verifier (
 
 ## Contributor workflow
 
+- **pnpm for Node/React.** Use `pnpm` for dependencies, tests and builds rather than npm. Preserve existing dependency versions and coordinate any lockfile migration explicitly.
+
 - **uv only.** All Python dependency management and execution must use `uv`. No `pip`, no `poetry`, no `conda`.
   - `uv add <pkg>` to add dependencies.
   - `uv sync --locked` to install from `uv.lock`.
@@ -33,8 +35,8 @@ The following commands are part of the development workflow. Not all are configu
 |---------|---------|--------|
 | `uv sync --locked` | Install dependencies from committed lock file | Not yet configured |
 | `uv run python -m mynotes test` | Run backend tests | Not yet configured |
-| `npm test` | Run frontend tests | Not yet configured |
-| `npm run build` | Build React app for production | Not yet configured |
+| `pnpm test` | Run frontend tests | Configured |
+| `pnpm run build` | Build React app for production | Configured |
 | `uv run python -m mynotes lint` | Lint backend code | Not yet configured |
 
 ## Secret & data exclusion

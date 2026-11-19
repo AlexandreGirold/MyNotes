@@ -15,7 +15,7 @@ export default function TextDocument({ text }: { text: string }) {
     const heading = line.match(/^#{1,3}\s+(.+)/);
     if (heading) return <h3 key={i}>{inline(heading[1])}</h3>;
     const task = line.match(/^[-*]\s+\[([ xX])\]\s+(.+)/);
-    if (task) return <div className="document-bullet" key={i}><input type="checkbox" checked={task[1] !== " "} readOnly aria-label={task[2]} /><div>{inline(task[2])}</div></div>;
+    if (task) return <div className="document-bullet" key={i}><input type="checkbox" checked={task[1] !== " "} disabled aria-label={task[2]} /><div>{inline(task[2])}</div></div>;
     const bullet = line.match(/^(?:[-*]|\d+\.)\s+(.+)/);
     if (bullet) return <div className="document-bullet" key={i}><span>•</span><div>{inline(bullet[1])}</div></div>;
     return line.trim() ? <p key={i}>{inline(line)}</p> : <div className="document-space" key={i} />;

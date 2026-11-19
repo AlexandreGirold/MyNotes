@@ -168,8 +168,11 @@ class SettingsUpdate(BaseModel):
     chat_harness: bool | None = None
 
 
-class WorkspaceSave(BaseModel):
+class WorkspacePath(BaseModel):
     path: str = Field(min_length=1, max_length=4096)
+
+
+class WorkspaceSave(WorkspacePath):
     text: str = Field(max_length=2 * 1024 * 1024)
     expected_sha256: str | None = Field(default=None, pattern="^[a-fA-F0-9]{64}$")
 
@@ -356,6 +359,14 @@ def create_app(
         from mynotes.workspace import atomic_write
         try:
             return atomic_write(body.path, body.text, db.get_settings().get("agent_directories", []), body.expected_sha256)
+        except (ValueError, OSError) as error:
+            raise workspace_error(error) from error
+
+    @rtr.post("/workspace/directories", status_code=201)
+    def workspace_create_directory(body: WorkspacePath) -> dict:
+        from mynotes.workspace import create_directory
+        try:
+            return create_directory(body.path, db.get_settings().get("agent_directories", []))
         except (ValueError, OSError) as error:
             raise workspace_error(error) from error
 

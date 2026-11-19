@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('mynotes', {
   setMicrophoneVolume: volume => ipcRenderer.invoke('setMicrophoneVolume', volume),
   selectImport: () => ipcRenderer.invoke('selectImport'),
   selectDirectories: () => ipcRenderer.invoke('selectDirectories'),
+  selectWorkspaceFiles: () => ipcRenderer.invoke('selectWorkspaceFiles'),
   saveTextFile: request => ipcRenderer.invoke('saveTextFile', request),
   saveRecordingChunk: (id, index, data) => ipcRenderer.invoke('saveRecordingChunk', id, index, data),
   finishRecording: id => ipcRenderer.invoke('finishRecording', id),

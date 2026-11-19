@@ -13,9 +13,12 @@ const marp = join(tools, 'marp');
 mkdirSync(marp, { recursive: true });
 // Use the project's lock, including every transitive production dependency.
 for (const name of ['package.json', 'package-lock.json']) copyFileSync(join(root, name), join(marp, name));
-const result = spawnSync('npm', ['ci', '--omit=dev', '--ignore-scripts'], { cwd: marp, stdio: 'inherit' });
-if (result.error) throw result.error;
-if (result.status !== 0) process.exit(result.status ?? 1);
+// Import only the generated bundle's lock; the project's committed lock/versions stay intact.
+for (const args of [['import'], ['install', '--prod', '--frozen-lockfile', '--ignore-scripts']]) {
+  const result = spawnSync('pnpm', args, { cwd: marp, stdio: 'inherit', env: { ...process.env, PNPM_CONFIG_NODE_LINKER: 'hoisted', PNPM_CONFIG_IGNORE_SCRIPTS: 'true', PNPM_CONFIG_STRICT_DEP_BUILDS: 'false' } });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
 const found = spawnSync('which', ['opencode'], { encoding: 'utf8' });
 if (found.status === 0) copyFileSync(found.stdout.trim(), join(tools, 'opencode'));
 const browser = await install({ browser: Browser.CHROMEHEADLESSSHELL,

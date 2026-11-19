@@ -31,6 +31,8 @@ interface NotesProps extends TabProps {
   onSource: (source: Block) => void;
   downloadFile: (path: string) => Promise<void>;
   deleteDocument?: (id: string) => Promise<void>;
+  onNewNote?: () => void;
+  onImport?: () => Promise<void>;
 }
 
 function SafeText({ children }: { children: string }) {
@@ -53,7 +55,7 @@ export default function Notes({
   saveMetadata, selectedDoc, version, saveNote, updateNote,
   loadDocumentDetails, toggleSelect,
   documents, searchQuery, setSearchQuery, doSearch, searchResults, searchLoading,
-  courses, selectedCourseId, onCourseFilterChange, onSource, downloadFile, deleteDocument,
+  courses, selectedCourseId, onCourseFilterChange, onSource, downloadFile, deleteDocument, onNewNote, onImport,
 }: NotesProps) {
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
@@ -116,6 +118,7 @@ export default function Notes({
       {view === "files" && <FileWorkspace />}
       <div style={{ ...S.wrap, display: view === "library" ? "flex" : "none" }}>
       <div style={S.sidebar}>
+        <div className="button-row">{onNewNote && <button onClick={onNewNote}>New recovery note</button>}{onImport && <button onClick={() => onImport().catch(e => setError(e instanceof Error ? e.message : "Import failed"))}>Import to library…</button>}</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 14 }}>Documents</h3>
           <button style={{ ...S.btn, fontSize: 12, padding: "2px 8px" }} onClick={() => setShowSearch((v) => !v)} aria-label="Toggle search">🔍</button>

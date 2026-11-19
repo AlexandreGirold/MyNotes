@@ -137,21 +137,28 @@ class Provider:
             )
         else:
             instructions = (
-                f"Write useful {note_kind} notes in {output_language}, 350–500 words maximum, with short Markdown headings and bullets. "
-                "No tables, HTML, raw source IDs, citations in every bullet, or repetition. Finish every section and sentence. "
+                f"Write a detailed, faithful content summary in {output_language} — not an action plan or TODO list. "
+                "Organise the summary as explanatory thematic sections with full paragraphs (not bullet points). "
+                "Derive logical sections and their headings directly from the transcript and personal notes, not from a generic template. "
+                "Integrate personal notes into the relevant sections; preserve their useful details and explicitly flag conflicts with the transcript. "
+                "Do not add action plans, TODO lists, recommendations or follow-up sections. Describe explicit requests only in their original context. "
+                "No tables, HTML, raw source IDs, or citations in every paragraph. "
                 "The source is noisy ASR: do not turn garbled names or dates into verified facts. Attribute claims to the speaker. "
                 "If speaker labels are supplied, distinguish proposals, disagreements and decisions by speaker. "
                 "Speaker numbers are anonymous labels, not real names. Speaker unknown and automatic attribution are uncertain; never invent an owner. "
-                "Use personal notes to clarify context; flag conflicts and uncertain names/numbers under a short localized 'To verify' heading. "
-                "Keep explicit TODOs and requests such as 'trouver définition', 'trouver difinition', 'à rechercher' or 'define' in a localized 'To do / Definitions to find' section. "
-                "These requested follow-ups are not completed tasks: never invent a researched definition or imply it was in the lecture. "
-                "Do not fact-check from memory, alter figures/dates, or invent an ending if speech cuts off. "
-                + ("For a lecture: organize the main thesis, arguments, counterarguments and implications. Do not invent meeting action items. "
-                   if note_kind == "lecture" else "For a meeting: include only actual decisions and explicit actions; do not manufacture owners/deadlines. ")
+                "Preserve arguments, examples, definitions, numbers, and nuance from the source. "
+                "Length should be proportionate to the transcript: cover all significant content without summarising away detail. "
+                "Mark uncertain names, numbers and incomplete passages in context. Do not invent facts beyond what the supplied sources support. "
+                + ("For a lecture: organise the main thesis, arguments, counterarguments and implications as detailed sections. "
+                   "Include relevant definitions, examples, and formulas when present in the transcript. "
+                   "Do not invent meeting action items. "
+                   if note_kind == "lecture" else "For a meeting: include only actual decisions and the reasoning behind them. "
+                   "Do not manufacture owners/deadlines. "
+                   "Do not add action-item lists, recommendations, or follow-up sections. ")
             )
         evidence = [{"title": b.get("title"), "text": b.get("text", b.get("excerpt", "")), "origin": b.get("origin")} for b in blocks]
         payload = {"model": self.chat_model, "stream": True, "temperature": 0.1,
-                   "max_tokens": 16000 if cleanup else 3000,
+                   "max_tokens": 16000 if cleanup else 8000,
                    "messages": [{"role": "system", "content": instructions + "\nProvided vocabulary: " + glossary},
                                 {"role": "user", "content": json.dumps(evidence, ensure_ascii=False)}]}
         answer = ""

@@ -20,14 +20,13 @@ it("downloads models through a queued job before allowing speaker capture", asyn
   });
   render(<LiveNotes active onJob={vi.fn()} onSaved={vi.fn()} onSettings={vi.fn()} />);
   expect(screen.getByRole("button", { name: "Pause audio" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Summarize session" })).toBeDisabled();
   expect(screen.getByRole("checkbox", { name: /distinguish speakers/i })).toBeDisabled();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: /download speaker models/i })));
   expect(request).toHaveBeenCalledWith("/diarization/setup", { method: "POST" });
   expect(screen.getByRole("checkbox", { name: /distinguish speakers/i })).toBeEnabled();
 });
 
-it("keeps Voxtral raw text and summarizes the derived speaker document after Stop", async () => {
+it("keeps Voxtral raw text and labels speakers after Stop", async () => {
   let socket: any;
   class Socket {
     static OPEN = 1;
@@ -48,6 +47,7 @@ it("keeps Voxtral raw text and summarizes the derived speaker document after Sto
     destination = {};
     resume = async () => {}; suspend = async () => {}; close = async () => {};
     createMediaStreamSource = () => ({ connect() {} });
+    createBiquadFilter = () => ({ type: "", frequency: { value: 0 }, connect() {} });
     createGain = () => ({ gain: { value: 0 }, connect() {} });
   }
   class Worklet {
@@ -75,19 +75,13 @@ it("keeps Voxtral raw text and summarizes the derived speaker document after Sto
   act(() => socket.onmessage({ data: JSON.stringify({ type: "delta", delta: "Bonjour. Non." }) }));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Pause audio" })));
   expect(track.enabled).toBe(false);
-  expect(screen.getByRole("button", { name: "Summarize session" })).toBeEnabled();
   expect(request.mock.calls.some(c => c[0] === "/chat")).toBe(false);
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Resume audio" })));
   expect(track.enabled).toBe(true);
   expect(getUserMedia).toHaveBeenCalledWith({ audio: expect.objectContaining({ autoGainControl: false }) });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: /stop recording/i })));
   expect(request.mock.calls.some(c => c[0] === "/chat")).toBe(false);
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Summarize session" })));
-  await waitFor(() => expect(screen.getByText("Deux avis différents.")).toBeInTheDocument());
-  const chat = request.mock.calls.find(c => c[0] === "/chat");
-  expect(JSON.parse(chat![1].body).document_ids).toEqual(["labelled"]);
-  expect(request.mock.calls.some(c => c[0] === "/notes/raw")).toBe(false);
-  expect(screen.getByLabelText("Live transcript")).toHaveValue("Speaker 1: Bonjour.\nSpeaker 2: Non.");
+  await waitFor(() => expect(screen.getByLabelText("Live transcript")).toHaveValue("Speaker 1: Bonjour.\nSpeaker 2: Non."));
   fireEvent.click(screen.getByRole("button", { name: "Original transcript" }));
   expect(screen.getByLabelText("Live transcript")).toHaveValue("Bonjour. Non.");
 });

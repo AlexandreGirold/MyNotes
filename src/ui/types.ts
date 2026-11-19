@@ -25,6 +25,7 @@ export interface ElectronBridge {
   getMicrophoneVolume(): Promise<{ volume: number; muted: boolean }>;
   setMicrophoneVolume(volume: number): Promise<{ volume: number; muted: boolean }>;
   selectDirectories(): Promise<string[]>;
+  selectWorkspaceFiles(): Promise<string[]>;
   saveTextFile(request: { name: string; text: string; format: "md" | "txt" | "typ" }): Promise<{ path: string; name: string } | null>;
   connection(): Promise<ConnectionInfo>;
   selectImport(): Promise<ImportedFile | null>;

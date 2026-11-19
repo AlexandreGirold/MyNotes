@@ -71,6 +71,11 @@ class TestSummarizeSSE:
         assert "French" in sys_text            # language=fr -> "French"
         assert "English" not in sys_text        # no forced English
         assert "no tables" in sys_text.lower()  # system prompt instructs "no tables"
+        assert "detailed" in sys_text
+        assert "transcript and personal notes" in sys_text
+        assert "Do not add action plans" in sys_text
+        assert "350–500" not in sys_text
+        assert captured_body[0]["max_tokens"] == 8000
 
     def test_summarize_cites_metadata_not_raw_ID_output(self) -> None:
         """Citations use metadata fields (title, excerpt) — no raw source_id leakage."""

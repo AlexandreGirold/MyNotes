@@ -137,7 +137,14 @@ ipcMain.handle('setMicrophoneVolume', async (event, volume) => {
 });
 ipcMain.handle('selectDirectories', async event => {
   checkSender(event);
+  if (isolatedSmoke && process.env.MYNOTES_FOLDER_TEST_PATH && path.resolve(process.env.MYNOTES_FOLDER_TEST_PATH).startsWith(path.resolve(app.getPath('userData')) + path.sep)) return [process.env.MYNOTES_FOLDER_TEST_PATH];
   const selected = await dialog.showOpenDialog(win, { title: 'Allow the agent to read these folders', properties: ['openDirectory', 'multiSelections'] });
+  return selected.canceled ? [] : selected.filePaths;
+});
+ipcMain.handle('selectWorkspaceFiles', async event => {
+  checkSender(event);
+  if (isolatedSmoke && process.env.MYNOTES_WORKSPACE_FILE_TEST_PATH && path.resolve(process.env.MYNOTES_WORKSPACE_FILE_TEST_PATH).startsWith(path.resolve(app.getPath('userData')) + path.sep)) return [process.env.MYNOTES_WORKSPACE_FILE_TEST_PATH];
+  const selected = await dialog.showOpenDialog(win, { title: 'Open original files (their parent folders will be added to the workspace)', properties: ['openFile', 'multiSelections'] });
   return selected.canceled ? [] : selected.filePaths;
 });
 ipcMain.handle('saveTextFile', async (event, request) => {
@@ -200,7 +207,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else app.whenReady().then(async () => {
   connection = await startBackend();
   win = new BrowserWindow({ width: 1200, height: 800, show: false,
-    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true,
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, zoomFactor: 1.2,
       offscreen: isolatedSmoke, backgroundThrottling: !isolatedSmoke },
   });
   win.webContents.on('will-navigate', event => event.preventDefault());
@@ -265,13 +272,13 @@ else app.whenReady().then(async () => {
       document.querySelectorAll('[role="tab"]')[0].click();
       await wait('Notes navigation', () => document.querySelector('.view-notes'));
       document.querySelectorAll('[role="tab"]')[2].click();
-      await wait('Provider setup', () => [...document.querySelectorAll('button')].some(b => b.textContent.includes('Start live transcription')));
+      await wait('Provider setup', () => [...document.querySelectorAll('button')].some(b => /Start live transcription|Restart live transcription/.test(b.textContent)));
       if (${!!process.env.MYNOTES_SPEAKER_SMOKE_TEST}) {
         const checkbox = () => [...document.querySelectorAll('label')].find(l => l.textContent.includes('Distinguish speakers'))?.querySelector('input');
         await wait('Speaker models ready', () => checkbox() && !checkbox().disabled);
         checkbox().click();
       }
-      [...document.querySelectorAll('button')].find(b => b.textContent.includes('Start live transcription')).click();
+      [...document.querySelectorAll('button')].find(b => /Start live transcription|Restart live transcription/.test(b.textContent)).click();
       await wait('Live transcript', () => document.querySelector('[aria-label="Live transcript"]').value.includes('Live sentence'));
       if (!document.body.textContent.includes('Listening')) throw new Error('Transcript did not appear during capture');
       const noteEditor = document.querySelector('[aria-label="Personal notes"]');
@@ -292,11 +299,11 @@ else app.whenReady().then(async () => {
       [...document.querySelectorAll('button')].find(b => b.textContent.includes('Resume audio')).click();
       await wait('Audio resumed', () => [...document.querySelectorAll('button')].some(b => b.textContent.includes('Pause audio')));
       [...document.querySelectorAll('button')].find(b => b.textContent.includes('Stop recording')).click();
-      await wait('Recording stopped without summary', () => [...document.querySelectorAll('button')].some(b => b.textContent.includes('Start live transcription')));
+      await wait('Recording stopped without summary', () => [...document.querySelectorAll('button')].some(b => /Start live transcription|Restart live transcription/.test(b.textContent)));
       if (document.querySelector('.paper-panel .text-document')) throw new Error('Stop unexpectedly generated a summary');
       [...document.querySelectorAll('button')].find(b => b.textContent === 'Summarize session').click();
       await wait('Summary', () => document.querySelector('.paper-panel .text-document')?.textContent.includes('Meeting summary'));
-      await wait('Summary finished', () => [...document.querySelectorAll('button')].some(b => b.textContent.includes('Start live transcription')));
+      await wait('Summary finished', () => [...document.querySelectorAll('button')].some(b => /Start live transcription|Restart live transcription/.test(b.textContent)));
       const authHeaders = { Authorization: 'Bearer ' + c.token };
       const summaryChats = await (await fetch(c.url + '/chats', { headers: authHeaders })).json();
       if (summaryChats.length) throw new Error('Automatic summary leaked into assistant history');
@@ -385,7 +392,7 @@ else app.whenReady().then(async () => {
       if (document.querySelectorAll('.conversation-open').length !== 2) throw new Error('Conversations were not preserved across navigation');
     })()`);
     await captureSmoke('-assistant');
-    await win.webContents.executeJavaScript(`(async () => {
+    const workspaceMetrics = await win.webContents.executeJavaScript(`(async () => {
       document.querySelectorAll('[role="tab"]')[0].click();
       for (let i = 0; i < 100 && !document.querySelector('.file-tree-entry'); i++) await new Promise(r => setTimeout(r, 50));
       const root = document.querySelector('.file-tree-entry');
@@ -396,8 +403,90 @@ else app.whenReady().then(async () => {
       if (!child || child.getBoundingClientRect().top < root.getBoundingClientRect().bottom - 1) throw new Error('Nested file tree is horizontally laid out');
       const browser = document.querySelector('.file-browser');
       if (browser.clientHeight > window.innerHeight) throw new Error('File browser is not bounded/scrollable');
+      const wait = async (label, test) => { for (let i = 0; i < 200; i++) { if (test()) return; await new Promise(r => setTimeout(r, 50)); } throw new Error(label); };
+      const button = text => [...document.querySelectorAll('.file-workspace button')].find(b => b.textContent === text);
+      const setText = (label, text) => { const input = document.querySelector('[aria-label="' + label + '"]'); Object.getOwnPropertyDescriptor(input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(input, text); input.dispatchEvent(new Event('input', { bubbles: true })); };
+      button('Add folder…').click();
+      await wait('Direct folder addition', () => !button('Add folder…').disabled && document.querySelector('.file-editor')?.textContent.includes('extra-files'));
+      button('Open files…').click();
+      await wait('Original file picker', () => document.querySelector('[aria-label="Laptop file content"]')?.value === '## Original opened file');
+      document.querySelector('.workspace-new summary').click();
+      setText('New folder name', 'Quick notes'); button('Create folder').click();
+      await wait('Subfolder created', () => !button('Create folder').disabled && document.querySelector('.file-editor')?.textContent.includes('Quick notes'));
+      setText('New file name', 'Session'); button('Create note').click();
+      await wait('Note created on disk', () => !button('Create note').disabled && document.querySelector('.file-editor .file-path')?.textContent.endsWith('/Quick notes/Session.md'));
+      const c = await window.mynotes.connection(), headers = { Authorization: 'Bearer ' + c.token, 'Content-Type': 'application/json' };
+      const originalPath = document.querySelector('.file-editor .file-path').textContent;
+      const readDisk = async () => (await fetch(c.url + '/workspace/text?path=' + encodeURIComponent(originalPath), { headers })).json();
+      if ((await readDisk()).text !== '') throw new Error('Create note did not create an actual empty file');
+      const fetchOriginal = window.fetch.bind(window); let listings = 0;
+      window.fetch = (...args) => { if (String(args[0]).includes('/workspace/entries?')) listings++; return fetchOriginal(...args); };
+      const checkbox = document.querySelector('.file-editor input[type="checkbox"]'); checkbox.click();
+      const note = '# Performance note' + String.fromCharCode(10).repeat(2) + 'A useful observation. '.repeat(7000);
+      const samples = []; let expected = '';
+      for (let i = 0; i < 20; i++) {
+        expected = note + ' change ' + i; const start = performance.now();
+        setText('Laptop file content', expected); await new Promise(requestAnimationFrame); samples.push(performance.now() - start);
+      }
+      const lastEdit = performance.now();
+      await wait('Autosave to original file', () => document.querySelector('.file-editor [role="status"]')?.textContent.includes('Saved to '));
+      const saved = await readDisk();
+      if (saved.text !== expected) throw new Error('Autosave lost the latest note text');
+      if (listings) throw new Error('Autosave rescanned the entire folder');
+      const autosaveMs = performance.now() - lastEdit;
+      const external = await fetch(c.url + '/workspace/text', { method: 'PUT', headers, body: JSON.stringify({ path: originalPath, text: 'External edit survives.', expected_sha256: saved.sha256 }) });
+      if (!external.ok) throw new Error('Could not simulate an external edit');
+      const draft = '# Meeting notes' + String.fromCharCode(10).repeat(2) + '- Important decision' + String.fromCharCode(10) + '- [ ] Follow up';
+      setText('Laptop file content', draft);
+      await wait('Conflict preserves draft', () => document.querySelector('.file-editor [role="alert"]')?.textContent.includes('draft retained'));
+      if (checkbox.checked || (await readDisk()).text !== 'External edit survives.') throw new Error('Autosave overwrote an external edit');
+      if (!localStorage.getItem('mynotes-laptop-file-drafts').includes('Important decision')) throw new Error('Conflicting note lost its recovery draft');
+      button('Review disk version').click();
+      await wait('Review external version', () => document.querySelector('[aria-label="Current disk version"]')?.value === 'External edit survives.');
+      button('Save my draft over reviewed version').click();
+      await wait('Explicit reviewed save', () => document.querySelector('.file-editor [role="status"]')?.textContent.includes('Saved to '));
+      if ((await readDisk()).text !== draft) throw new Error('Reviewed manual save failed');
+      window.fetch = fetchOriginal; samples.sort((a, b) => a - b);
+      return { typing_events: samples.length, median_input_to_frame_ms: Math.round(samples[Math.floor(samples.length / 2)] * 10) / 10,
+        max_input_to_frame_ms: Math.round(samples[samples.length - 1] * 10) / 10, autosave_after_typing_ms: Math.round(autosaveMs), autosave_directory_reload_count: listings };
     })()`);
+    console.log('Workspace desktop performance/acceptance: ' + JSON.stringify(workspaceMetrics));
     await captureSmoke('-files');
+    if (process.env.MYNOTES_LAYOUT_SMOKE_TEST) {
+      for (const width of [1200, 800, 1600]) {
+        win.setSize(width, 800);
+        for (let tab = 0; tab < 5; tab++) {
+          const layout = await win.webContents.executeJavaScript(`(async () => {
+            document.querySelectorAll('[role="tab"]')[${tab}].click();
+            await new Promise(r => setTimeout(r, 250));
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const content = document.querySelector('.tab-content');
+            if (content.scrollWidth > content.clientWidth + 2) throw new Error('Horizontal page overflow');
+            const visibleRect = el => {
+              const r = el.getBoundingClientRect();
+              let left = Math.max(0, r.left), top = Math.max(0, r.top), right = Math.min(innerWidth, r.right), bottom = Math.min(innerHeight, r.bottom);
+              for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+                const s = getComputedStyle(parent), p = parent.getBoundingClientRect();
+                if (s.overflowX !== 'visible') { left = Math.max(left, p.left); right = Math.min(right, p.right); }
+                if (s.overflowY !== 'visible') { top = Math.max(top, p.top); bottom = Math.min(bottom, p.bottom); }
+              }
+              return { left, top, right, bottom };
+            };
+            const controls = [...document.querySelectorAll('button,input,select,textarea')].filter(el => el.checkVisibility({ checkVisibilityCSS: true, contentVisibilityAuto: true })).map(el => ({ el, rect: visibleRect(el) })).filter(({ rect }) => rect.right - rect.left > 2 && rect.bottom - rect.top > 2);
+            for (let i = 0; i < controls.length; i++) for (let j = i + 1; j < controls.length; j++) {
+              const a = controls[i], b = controls[j];
+              if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+              if (Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left) > 2 && Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top) > 2) throw new Error('Overlapping controls: ' + (a.el.getAttribute('aria-label') || a.el.textContent).slice(0, 50) + ' / ' + (b.el.getAttribute('aria-label') || b.el.textContent).slice(0, 50));
+            }
+            const editor = document.querySelector('.view-notes .file-editor .markdown-input'), actions = document.querySelector('.view-notes .file-actions');
+            if (editor && actions && actions.getBoundingClientRect().top < editor.getBoundingClientRect().bottom - 1) throw new Error('Save bar covers file editor');
+            return { viewport: innerWidth, controls: controls.length };
+          })()`);
+          console.log('Layout acceptance: ' + JSON.stringify({ width, tab, zoom: win.webContents.getZoomFactor(), ...layout }));
+          await captureSmoke('-layout-' + width + '-' + tab);
+        }
+      }
+    }
     app.quit();
   }
   if (process.env.MYNOTES_SMOKE_TEST) {

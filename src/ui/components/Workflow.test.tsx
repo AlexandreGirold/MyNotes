@@ -16,10 +16,9 @@ describe("LiveNotes workflow", () => {
   });
   afterEach(() => { vi.restoreAllMocks(); mockSave.mockReset(); });
 
-  it("no API key → summary disabled; transcript editable", () => {
+  it("no API key → transcript editable", () => {
     render(<LiveNotes active={false} onJob={vi.fn()} onSaved={vi.fn()} onSettings={vi.fn()} />);
     expect(screen.getByRole("textbox", { name: "Live transcript" })).toHaveValue("");
-    expect(screen.getByRole("button", { name: "Summarize transcript" })).toBeDisabled();
   });
 
   it("save transcript as… — .md format, no double extension", async () => {

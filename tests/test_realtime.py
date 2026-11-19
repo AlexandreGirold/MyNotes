@@ -63,21 +63,23 @@ def client_for(tmp_path, base=None, key=True):
     return db, TestClient(app)
 
 
-def test_live_delta_arrives_before_stop_and_only_text_is_saved(tmp_path):
+@pytest.mark.parametrize("initial_text", ["", "Earlier notes."])
+def test_live_delta_arrives_before_stop_and_only_text_is_saved(tmp_path, initial_text):
     with provider() as (base, captured):
         db, client = client_for(tmp_path, base)
         with client, client.websocket_connect("/live-transcription") as socket:
-            socket.send_json({"token": "app-test", "title": "My meeting"})
+            socket.send_json({"token": "app-test", "title": "My meeting", "initial_text": initial_text})
             assert socket.receive_json()["type"] == "ready"
             audio = b"\x01\x00\x02\x00"
             socket.send_bytes(audio)
             delta = socket.receive_json()
-            assert delta == {"type": "delta", "delta": "A live sentence."}
+            addition = ("\n\n" if initial_text else "") + "A live sentence."
+            assert delta == {"type": "delta", "delta": addition}
             assert "placeholder-test-key" not in json.dumps(delta)
             socket.send_json({"type": "stop"})
             done = socket.receive_json()
             assert done["type"] == "done"
-            assert done["text"] == "A live sentence."
+            assert done["text"] == initial_text + addition
             document = db.get_document(done["document_id"])
             assert (tmp_path / document["original_path"]).read_text() == done["text"]
         assert captured[0] == {"type": "session.update", "model": "voxtral"}
@@ -95,6 +97,15 @@ def test_missing_key_is_explicit_and_wrong_app_token_is_rejected(tmp_path):
         socket.send_json({"token": "wrong"})
         with pytest.raises(WebSocketDisconnect):
             socket.receive_json()
+    assert db.list_documents() == []
+
+
+@pytest.mark.parametrize("initial_text", [["not a transcript"], "x" * 2000001])
+def test_invalid_existing_transcript_is_rejected_without_saving(tmp_path, initial_text):
+    db, client = client_for(tmp_path)
+    with client, client.websocket_connect("/live-transcription") as socket:
+        socket.send_json({"token": "app-test", "initial_text": initial_text})
+        assert socket.receive_json() == {"type": "error", "message": "Invalid existing transcript"}
     assert db.list_documents() == []
 
 

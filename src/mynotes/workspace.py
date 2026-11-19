@@ -1,10 +1,11 @@
 """Browse and atomically edit canonical laptop files in the selected directories."""
 import hashlib
 import os
+import stat
 import tempfile
 from pathlib import Path
 
-from mynotes.agent_files import allowed
+from mynotes.agent_files import _allowed_in, allowed, roots
 
 MAX_TEXT = 2 * 1024 * 1024
 _TEXT_EXTENSIONS = frozenset([".md", ".markdown", ".txt", ".text", ".typ", ".csv", ".log", ".rst", ".org", ".adoc", ".py", ".js", ".ts", ".tsx", ".jsx", ".css", ".scss", ".html", ".java", ".c", ".cpp", ".h", ".hpp", ".cs", ".go", ".rs", ".rb", ".php", ".swift", ".kt", ".scala", ".clj", ".hs", ".m", ".mm", ".r", ".jl", ".dart", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".xml", ".properties", ".sh", ".bash", ".zsh", ".fish", ".sql", ".graphql", ".proto", ".tf", ".note", ".sticky"])
@@ -26,20 +27,23 @@ def list_directory(path, directories, offset=0, limit=200):
     if offset < 0 or not 1 <= limit <= 200:
         raise ValueError("Invalid directory page")
     entries = []
-    paths = (Path(p) for p in directories) if not path else _allowed(path, directories).iterdir()
+    selected = roots(directories)
+    parent = _allowed_in(path, selected) if path else None
+    paths = selected if parent is None else parent.iterdir()
     for child in paths:
         try:
-            resolved = _allowed(str(child), directories)
-            if not (resolved.is_dir() or resolved.is_file()):
+            resolved = _allowed_in(str(child), selected)
+            metadata = resolved.stat()
+            directory, regular = stat.S_ISDIR(metadata.st_mode), stat.S_ISREG(metadata.st_mode)
+            if not (directory or regular):
                 continue
-            entries.append({"name": child.name, "path": str(resolved), "directory": resolved.is_dir(),
-                            "size": resolved.stat().st_size,
-                            "editable": resolved.is_file() and _is_text_file(resolved)})
+            entries.append({"name": child.name, "path": str(resolved), "directory": directory,
+                            "size": metadata.st_size, "editable": regular and _is_text_file(resolved)})
         except (OSError, ValueError):
             continue
     entries.sort(key=lambda item: (not item["directory"], item["name"].casefold(), item["name"]))
     end = offset + limit
-    return {"path": str(_allowed(path, directories)) if path else "", "entries": entries[offset:end],
+    return {"path": str(parent) if parent else "", "entries": entries[offset:end],
             "next_offset": end if end < len(entries) else None}
 
 
@@ -58,6 +62,18 @@ def read_text(path, directories):
     return {"path": str(file), "text": raw.decode("utf-8"), "sha256": hashlib.sha256(raw).hexdigest()}
 
 
+def create_directory(path, directories):
+    folder = _allowed(path, directories)
+    parent = _allowed(str(folder.parent), directories)
+    if not parent.is_dir():
+        raise ValueError("Choose an existing allowed folder")
+    try:
+        folder.mkdir(mode=0o700)
+    except FileExistsError as error:
+        raise WorkspaceConflict("A file or folder with this name already exists") from error
+    return {"path": str(folder)}
+
+
 def atomic_write(path, text, directories, expected_sha256=None):
     file = _allowed(path, directories)
     parent = _allowed(str(file.parent), directories)
@@ -74,7 +90,9 @@ def atomic_write(path, text, directories, expected_sha256=None):
         if file.exists():
             if not file.is_file() or file.stat().st_size > MAX_TEXT or expected_sha256 is None:
                 raise WorkspaceConflict("File already exists; reopen it before saving")
-            if hashlib.sha256(file.read_bytes()).hexdigest() != expected_sha256.lower():
+            with file.open("rb") as source:
+                original = source.read(MAX_TEXT + 1)
+            if len(original) > MAX_TEXT or hashlib.sha256(original).hexdigest() != expected_sha256.lower():
                 raise WorkspaceConflict("File changed externally; draft retained")
         elif expected_sha256 is not None:
             raise WorkspaceConflict("File was removed externally; draft retained")
@@ -82,8 +100,8 @@ def atomic_write(path, text, directories, expected_sha256=None):
     fd, temporary = tempfile.mkstemp(dir=parent, prefix=f".mynotes-{file.name}.")
     temp = Path(temporary)
     try:
-        os.fchmod(fd, (file.stat().st_mode & 0o777) if file.exists() else 0o600)
         with os.fdopen(fd, "wb") as output:
+            os.fchmod(output.fileno(), (file.stat().st_mode & 0o777) if file.exists() else 0o600)
             output.write(encoded)
             output.flush()
             os.fsync(output.fileno())

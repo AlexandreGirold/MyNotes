@@ -240,22 +240,6 @@ export default function App() {
       <div className="workspace-main"><header className="workspace-topbar"><span>My workspace <span className="breadcrumb-divider">/</span> <strong>{tabs.find(tab => tab.id === activeTab)?.label || "Source"}</strong></span><div className="button-row">{liveStatus === "live" && <button className="text-button" onClick={() => setActiveTab("recording")}>● Transcript running</button>}<span className="workspace-count">{documents.length} document{documents.length === 1 ? "" : "s"}</span><ThemeToggle /></div></header>
       <main className={`tab-content view-${activeTab}`} role="tabpanel">
         {activeTab === "notes" && <div className="page-heading"><div><div className="page-eyebrow">YOUR KNOWLEDGE, TOGETHER</div><h1>Notes & files</h1></div><span className="muted">Write, collect and organize.</span></div>}
-        {activeTab === "notes" && <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={() => { setSelectedIds([]); setSelectedDoc(null); setVersion(null); setNoteTitle(""); setNoteContent(""); }}>New note</button>
-          <button onClick={async () => {
-            try {
-              const file = await window.mynotes.selectImport();
-              if (!file) return;
-              const body = new FormData();
-              body.append("file", new Blob([file.data]), file.name);
-              if (file.kind) body.append("kind", file.kind);
-              if (file.name.endsWith(".zip")) body.append("entrypoint", window.prompt("Typst project entry point", "main.typ") || "main.typ");
-              const job = await jsonApi<Job>("/imports", { method: "POST", body });
-              setJobs(s => ({ ...s, [job.id]: job }));
-              pollJob(job.id);
-            } catch (e) { window.alert(e instanceof Error ? e.message : "Import failed"); }
-          }}>Import document</button>
-        </div>}
         {Object.values(jobs).filter(job => job.status === "failed").map(job => (
           <p role="alert" key={job.id}>{job.error || "Job failed"} <button onClick={async () => {
             const retry = await jsonApi<Job>(`/jobs/${job.id}/retry`, { method: "POST" });
@@ -264,6 +248,16 @@ export default function App() {
         ))}
         {activeTab === "notes" && (
           <Notes selectedIds={selectedIds} onJob={sharedJobHandler} jobs={jobs}
+            onNewNote={() => { setSelectedIds([]); setSelectedDoc(null); setVersion(null); setNoteTitle(""); setNoteContent(""); }}
+            onImport={async () => {
+              const file = await window.mynotes.selectImport();
+              if (!file) return;
+              const body = new FormData(); body.append("file", new Blob([file.data]), file.name);
+              if (file.kind) body.append("kind", file.kind);
+              if (file.name.endsWith(".zip")) body.append("entrypoint", window.prompt("Typst project entry point", "main.typ") || "main.typ");
+              const job = await jsonApi<Job>("/imports", { method: "POST", body });
+              setJobs(s => ({ ...s, [job.id]: job })); pollJob(job.id);
+            }}
             noteFormat={noteFormat} noteTitle={noteTitle}   noteContent={noteContent} noteCourse={noteCourse}
             setNoteFormat={setNoteFormat} setNoteTitle={setNoteTitle}
             setNoteContent={setNoteContent} setNoteCourse={setNoteCourse}

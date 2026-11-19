@@ -75,11 +75,15 @@ if __name__ == "__main__":
     for i in range(32):
         (files / f"Project {i + 1:02}").mkdir()
     (files / "Project 01" / "note.md").write_text("## Canonical file\n\nCANONICAL_FILE_SIGNAL: 42")
+    extra = Path(test_data) / "extra-files"
+    extra.mkdir()
+    (extra / "opened.md").write_text("## Original opened file")
     if os.environ.get("MYNOTES_SPEAKER_SMOKE_TEST"):
         shutil.copytree(os.environ.get("MYNOTES_SPEAKER_MODELS", "/tmp/opencode/mynotes-speaker-models"),
                         Path(test_data) / "data" / "models" / "diarization")
     env = {**os.environ, "MYNOTES_LIVE_SMOKE_TEST": "1", "MYNOTES_TEST_PROVIDER_URL": f"http://127.0.0.1:{port}/v1",
-           "MYNOTES_TEST_DATA_DIR": test_data, "MYNOTES_SAVE_TEST_PATH": str(Path(test_data) / "Chosen session name.md"),
+            "MYNOTES_TEST_DATA_DIR": test_data, "MYNOTES_SAVE_TEST_PATH": str(Path(test_data) / "Chosen session name.md"),
+            "MYNOTES_FOLDER_TEST_PATH": str(extra), "MYNOTES_WORKSPACE_FILE_TEST_PATH": str(extra / "opened.md"),
            "MYNOTES_SCREENSHOT": "/tmp/opencode/mynotes-live-ui.png"}
     try:
         executable = root / "out/MyNotes-linux-x64/MyNotes"

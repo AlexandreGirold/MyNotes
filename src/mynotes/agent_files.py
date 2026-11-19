@@ -10,11 +10,15 @@ def roots(directories: list[str] | None = None) -> list[Path]:
 
 
 def allowed(path: str, directories: list[str] | None = None) -> Path:
+    return _allowed_in(path, roots(directories))
+
+
+def _allowed_in(path: str, selected: list[Path]) -> Path:
+    """Shared guard with already-resolved roots; resolve each candidate, never cache it."""
     resolved = Path(path).expanduser().resolve()
-    selected = roots() if directories is None else [Path(p).expanduser().resolve() for p in directories]
     if not any(resolved.is_relative_to(root) for root in selected):
         raise ValueError("Path is outside the allowed directories")
-    secret_names = {"credentials.enc", "encryption-key.enc", "auth.json", ".ssh", ".aws", ".gnupg", ".kube", ".azure"}
+    secret_names = {"credentials.enc", "encryption-key.enc", "auth.json", ".ssh", ".aws", ".gnupg", ".kube", ".azure", ".netrc", ".npmrc", ".pypirc", ".git-credentials", ".git"}
     if any(part.lower().startswith(".env") or part.lower() in secret_names for part in resolved.parts) or resolved.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}:
         raise ValueError("Credential files are not accessible to the agent")
     return resolved
